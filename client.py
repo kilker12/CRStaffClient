@@ -28,6 +28,9 @@ class ClientSock():
                 self.loggedinusername = username
                 self.secukey = reply[1] + "," + username + ":"
                 return 1
+    def close(self):
+        self.sock.close
+        
     def search(self, string):
         if len(string) > 2:
             prep = self.secukey + "search:" + string
@@ -52,7 +55,10 @@ class ClientSock():
             prep = self.secukey + "getchat:" + player
             self.sock.send(prep.encode())
             data = self.sock.recv(10240)
-            return eval(data)
+            if data == "no data":
+                return
+            else:
+                return ("No data")
 
 class Data:
     root = Tk()
@@ -67,7 +73,8 @@ class Data:
     banned = StringVar()
     muted = StringVar()
     banreason = StringVar()
-    commands = {}
+    commands = None
+    chat = None
     notes = {}
     playerfull = {}
 
@@ -77,7 +84,6 @@ class Data:
     def refreshfulldata(self, player):
         server = 'survival'
         self.playerfull = self.server.getinfo(player)
-        print self.playerfull
         self.rank.set(self.playerfull['rank'])
         self.ip.set(self.playerfull['servers']['survival']['ipAddress'])
         self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
@@ -97,6 +103,9 @@ class Data:
         except:
             self.banned.set("No")
             self.banreason.set("-")
+        self.chat = self.server.getchat(player)
+        self.commands = self.server.getcommands(player)
+        print self.commands
     def changedata(self, server):
         try:
             self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
@@ -147,12 +156,14 @@ class App:
     serverbox = None
     serverselection = None
     serverframe = None
+    historyframe = Frame(userframe)
     onuser = 0
 
     def __init__(self):
         self.root = self.data.root
         self.root.geometry("300x500")
         self.root.resizable(width=FALSE, height=FALSE)
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.loginframe.pack(fill=BOTH)
         Label(self.loginframe, text="Please login below").pack()
         Label(self.loginframe, text="Username:").pack()
@@ -263,14 +274,28 @@ class App:
         Label(self.serverframe, text="Banned:", anchor=W).grid(row=7)
         Label(self.serverframe, textvariable=self.data.banned).grid(row=7, column=1)
 
-        Button(self.serverframe, text="Chat", anchor=W, command=self.server.getchat(self.currentplayer)).grid(row=8)
+        Button(self.serverframe, text="Chat", command=self.server.getchat(self.currentplayer)).grid(row=8)
+        Button(self.serverframe, text="History", command=self.historywindow).grid(row=9)
 
     def changeserver(self, event=None):
         self.currentserver = self.serverbox.get().lower()
         self.data.changedata(self.currentserver)
 
+    def historywindow(self):
+        self.serverframe.pack_forget()
+        self.historyframe.pack(fill=BOTH, expand=1)
+        Label(self.historyframe, text="Command History").pack()
+        commandbox = Listbox(self.historyframe, height=10)
+        for i in self.data.commands:
+            commandbox.insert(END, i['date'] + " " + i['data'])
+        commandbox.pack(fill=X, expand=1)
+
     def runloop(self):
         self.root.mainloop()
+
+    def close(self):
+        self.server.close()
+        self.root.destroy()
 
 app = App()
 
