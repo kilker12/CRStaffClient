@@ -2,6 +2,7 @@ from Tkinter import *
 from ttk import *
 import socket
 import sys
+import datetime
 
 class ClientSock():
     loggedinusername = None
@@ -14,7 +15,6 @@ class ClientSock():
         try:
             self.sock = socket.socket()
             self.sock.connect(("mc.craftrealms.com", 9999))
-            print "1"
         except:
             Label(self.root, text="Cannot get connection to server!").pack()
             Button(self.root, text="Close").pack()
@@ -41,6 +41,18 @@ class ClientSock():
             self.sock.send(prep.encode())
             data = self.sock.recv(10240)
             return eval(data)
+    def getcommands(self, player):
+        if len(player) > 2:
+            prep = self.secukey + "getcommands:" + player
+            self.sock.send(prep.encode())
+            data = self.sock.recv(10240)
+            return eval(data)
+    def getchat(self, player):
+        if len(player) > 2:
+            prep = self.secukey + "getchat:" + player
+            self.sock.send(prep.encode())
+            data = self.sock.recv(10240)
+            return eval(data)
 
 class Data:
     root = Tk()
@@ -62,13 +74,60 @@ class Data:
     def __init__(self, server):
         self.server = server
         
-    def refreshdata(self, player, server):
+    def refreshfulldata(self, player):
+        server = 'survival'
         self.playerfull = self.server.getinfo(player)
-        print self.playerfull['servers']['survival']
+        print self.playerfull
         self.rank.set(self.playerfull['rank'])
         self.ip.set(self.playerfull['servers']['survival']['ipAddress'])
+        self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
+        self.lastlogin.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['login'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
+        self.lasttp.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['lastteleport'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
+        self.lastlogout.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['logout'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
+        try:
+            if(self.playerfull['servers'][server]['muted']):
+                self.muted.set("Yes")
+            else:
+                self.muted.set("No")
+        except:
+            self.muted.set("No")
+        try:
+            self.banreason.set(self.playerfull['servers'][server]['ban']['reason'])
+            self.banned.set("Yes")
+        except:
+            self.banned.set("No")
+            self.banreason.set("-")
+    def changedata(self, server):
+        try:
+            self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
+        except:
+            self.coordinates.set("-")
+        try:
+            self.lastlogin.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['login'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
+        except:
+            self.lastlogin.set("-")
+        try:
+            self.lasttp.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['lastteleport'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
+        except:
+            self.lasttp.set("-")
+        try:
+            self.lastlogout.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['logout'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
+        except:
+            self.lastlogout.set("-")
+        try:
+            if(self.playerfull['servers'][server]['muted']):
+                self.muted.set("Yes")
+            else:
+                self.muted.set("No")
+        except:
+            self.muted.set("No")
+        try:
+            self.banreason.set(self.playerfull['servers'][server]['ban']['reason'])
+            self.banned.set("Yes")
+        except:
+            self.banned.set("No")
+            self.banreason.set("-")
         
-
 class App:
     root = None
     userentry = StringVar()
@@ -84,10 +143,11 @@ class App:
     searchentry = Entry(root, textvariable=searchstr)
     searchscroll = Scrollbar(searchframe)
     searchresults = Listbox(searchframe, selectmode=SINGLE, yscrollcommand=searchscroll.set)
-    userframe = Frame(root)
+    userframe = None
     serverbox = None
-    serverselection = Frame(userframe)
-    serverframe = Frame(userframe)
+    serverselection = None
+    serverframe = None
+    onuser = 0
 
     def __init__(self):
         self.root = self.data.root
@@ -104,7 +164,6 @@ class App:
         passentry.pack(fill=X, expand=1)
         passentry.bind("<Return>", self.dologin)
         Button(self.loginframe, text="Login", command=self.dologin).pack(fill=X)
-        print "4"
         
     def dologin(self, event=None):
         login = self.server.login(self.userentry.get(), self.passentry.get())
@@ -113,41 +172,62 @@ class App:
             self.loginframe.destroy()
             self.opensearchframe()
 
-    def clearsearch(self, event=None):
-        if self.firstsearch:
-            self.searchstr.set("")
+    def playerHistories(self):
+        player = self.currentplayer.get()
+        
 
     def opensearchframe(self):
         self.searchstr.set("Search for player...")
         if self.firstsearch:
             self.searchstr.trace("w", lambda name, index, mode, sv=self.searchstr: self.dosearch(sv))
             self.searchentry.pack(fill=X)
-            self.searchentry.bind("<Button-1>", self.clearsearch)
             self.searchresults.bind("<<ListboxSelect>>", self.selectplayer)
+            self.searchentry.focus()
         self.searchresults.pack(fill=BOTH, expand=1)
 
         self.searchframe.pack(fill=BOTH, expand=1)
 
     def dosearch(self, stringvar):
+        if self.firstsearch:
+                self.searchstr.set("")
+                self.firstsearch = 0
         search = self.server.search(stringvar.get())
         if not search == None:
+            if self.onuser:
+                self.userframe.pack_forget()
+                self.userframe.destroy()
+                self.searchframe.pack(fill=BOTH, expand=1)
             self.searchresults.delete(0, END)
             for user in search:
                 self.searchresults.insert(END, user)
+                self.searchentry.focus()
             self.searchscroll.config(command=self.searchresults.yview)
+        else:
+            self.searchresults.delete(0, END)
+
+    def ipclick(self, event):
+        self.searchstr.set(self.data.ip.get())
+        self.dosearch(self.searchstr)
 
     def selectplayer(self, event):
         self.currentplayer = self.searchresults.get(self.searchresults.curselection()[0])
         self.searchframe.pack_forget()
         count = 1
+        self.onuser = 1
         serverselect = {}
+        self.userframe = Frame(self.root)
+        self.serverframe = Frame(self.userframe)
+        self.serverselection = Frame(self.userframe)
         self.serverselection.pack(side=TOP)
+        self.serverframe.pack(fill=BOTH, expand=1)
+        self.userframe.pack(fill=BOTH, expand=1)
         self.currentserver = 'survival'
         self.serverbox = Combobox(self.serverselection, values="Survival HG PVP Hub", width=295)
         self.serverbox.pack(fill=X, expand=1)
         self.serverbox.current(newindex=0)
         self.serverbox.bind('<<ComboboxSelected>>', self.changeserver)
-        self.data.refreshdata(self.currentplayer, self.currentserver)
+        self.data.refreshfulldata(self.currentplayer)
+        self.serverframe.columnconfigure(1, weight=1)
 
         # Rank 0
         Label(self.serverframe, text="Rank:", anchor=W).grid()
@@ -155,20 +235,42 @@ class App:
 
         # IP 1
         Label(self.serverframe, text="IP:", anchor=W).grid(row=1)
-        Label(self.serverframe, textvariable=self.data.ip, anchor=W).grid(row=1, column=1)
+        ip = Label(self.serverframe, textvariable=self.data.ip)
+        ip.grid(row=1, column=1)
+        ip.bind("<Button-1>", self.ipclick)
 
-        self.serverframe.pack(fill=BOTH, expand=1)
-        self.userframe.pack(fill=BOTH, expand=1)
+        # Coords 2
+        Label(self.serverframe, text="Last Location:", anchor=W).grid(row=2)
+        Label(self.serverframe, textvariable=self.data.coordinates).grid(row=2, column=1)
+
+        # Last Login 3
+        Label(self.serverframe, text="Last Login:", anchor=W).grid(row=3)
+        Label(self.serverframe, textvariable=self.data.lastlogin).grid(row=3, column=1)
+
+        # Last Logout 4
+        Label(self.serverframe, text="Last Logout:", anchor=W).grid(row=4)
+        Label(self.serverframe, textvariable=self.data.lastlogout).grid(row=4, column=1)
+
+        # Last teleport 5
+        Label(self.serverframe, text="Last Teleport:", anchor=W).grid(row=5)
+        Label(self.serverframe, textvariable=self.data.lasttp).grid(row=5, column=1)
+
+        # Muted 6
+        Label(self.serverframe, text="Muted:", anchor=W).grid(row=6)
+        Label(self.serverframe, textvariable=self.data.muted).grid(row=6, column=1)
+
+        # Banned 7
+        Label(self.serverframe, text="Banned:", anchor=W).grid(row=7)
+        Label(self.serverframe, textvariable=self.data.banned).grid(row=7, column=1)
+
+        Button(self.serverframe, text="Chat", anchor=W, command=self.server.getchat(self.currentplayer)).grid(row=8)
 
     def changeserver(self, event=None):
-        newserver = self.serverbox.get(self.serverbox.current())
-        print(self.currentserver)
+        self.currentserver = self.serverbox.get().lower()
+        self.data.changedata(self.currentserver)
 
     def runloop(self):
         self.root.mainloop()
-        
-    
-
 
 app = App()
 
