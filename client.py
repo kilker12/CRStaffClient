@@ -28,8 +28,11 @@ class ClientSock():
                 self.loggedinusername = username
                 self.secukey = reply[1] + "," + username + ":"
                 return 1
+            else:
+                print reply
     def close(self):
-        self.sock.close
+        self.sock.send("disconnect".encode())
+        self.sock.close()
         
     def search(self, string):
         if len(string) > 2:
@@ -104,8 +107,10 @@ class Data:
             self.banned.set("No")
             self.banreason.set("-")
         self.chat = self.server.getchat(player)
+        if self.chat == None:
+            self.chat = [{"date": "No data", "data": ""}]
         self.commands = self.server.getcommands(player)
-        print self.commands
+        print self.chat
     def changedata(self, server):
         try:
             self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
@@ -156,7 +161,7 @@ class App:
     serverbox = None
     serverselection = None
     serverframe = None
-    historyframe = Frame(userframe)
+    historyframe = None
     onuser = 0
 
     def __init__(self):
@@ -185,7 +190,6 @@ class App:
 
     def playerHistories(self):
         player = self.currentplayer.get()
-        
 
     def opensearchframe(self):
         self.searchstr.set("Search for player...")
@@ -282,13 +286,26 @@ class App:
         self.data.changedata(self.currentserver)
 
     def historywindow(self):
+        self.historyframe = Frame(userframe)
         self.serverframe.pack_forget()
         self.historyframe.pack(fill=BOTH, expand=1)
+        Button(self.historyframe, text="Back", command=self.historyback).pack(fill=X)
         Label(self.historyframe, text="Command History").pack()
         commandbox = Listbox(self.historyframe, height=10)
         for i in self.data.commands:
             commandbox.insert(END, i['date'] + " " + i['data'])
         commandbox.pack(fill=X, expand=1)
+
+        Label(self.historyframe, text="Chat History").pack()
+        chatbox = Listbox(self.historyframe, height=10)
+        for i in self.data.chat:
+            chatbox.insert(END, i['date'] + " " + i['data'])
+        chatbox.pack(fill=X, expand=1)
+
+    def historyback(self):
+        self.historyframe.pack_forget()
+        self.historyframe.destroy()
+        self.serverframe.pack(fill=BOTH, expand=1)
 
     def runloop(self):
         self.root.mainloop()
