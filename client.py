@@ -17,7 +17,11 @@ class ClientSock():
             self.sock.connect(("mc.craftrealms.com", 9999))
         except:
             Label(self.root, text="Cannot get connection to server!").pack()
-            Button(self.root, text="Close").pack()
+            Button(self.root, text="Close", command=self.closewin).pack()
+            self.root.mainloop()
+    def closewin(self):
+        self.root.destroy()
+        self.root.quit()
     def login(self, username, password):
         if len(username) > 2 and len(password) > 2:
             prep = "login:" + username + ":" + password
@@ -28,6 +32,8 @@ class ClientSock():
                 self.loggedinusername = username
                 self.secukey = reply[1] + "," + username + ":"
                 return 1
+            elif reply[0] == "bad":
+                return 0
             else:
                 print reply
     def close(self):
@@ -149,7 +155,7 @@ class App:
     currentplayer = None
     currentserver = None
     firstsearch = True
-    server = ClientSock(root)
+    server = None
     data = Data(server)
     loginframe = Frame(root)
     searchframe = Frame(root)
@@ -166,6 +172,7 @@ class App:
 
     def __init__(self):
         self.root = self.data.root
+        self.server = ClientSock(root)
         self.root.geometry("300x500")
         self.root.resizable(width=FALSE, height=FALSE)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
@@ -176,7 +183,7 @@ class App:
         userentry.pack(fill=X, expand=1)
         userentry.focus()
         Label(self.loginframe, text="Password:").pack()
-        passentry = Entry(self.loginframe, textvariable=self.passentry)
+        passentry = Entry(self.loginframe, show="*", textvariable=self.passentry)
         passentry.pack(fill=X, expand=1)
         passentry.bind("<Return>", self.dologin)
         Button(self.loginframe, text="Login", command=self.dologin).pack(fill=X)
@@ -187,9 +194,8 @@ class App:
             self.loginframe.pack_forget()
             self.loginframe.destroy()
             self.opensearchframe()
-
-    def playerHistories(self):
-        player = self.currentplayer.get()
+        else:
+            Label(self.loginframe, text="Bad login!").pack(fill=X)
 
     def opensearchframe(self):
         self.searchstr.set("Search for player...")
@@ -197,9 +203,7 @@ class App:
             self.searchstr.trace("w", lambda name, index, mode, sv=self.searchstr: self.dosearch(sv))
             self.searchentry.pack(fill=X)
             self.searchresults.bind("<<ListboxSelect>>", self.selectplayer)
-            self.searchentry.focus()
         self.searchresults.pack(fill=BOTH, expand=1)
-
         self.searchframe.pack(fill=BOTH, expand=1)
 
     def dosearch(self, stringvar):
