@@ -67,11 +67,18 @@ class ClientSock():
             if data == "no data":
                 return
             else:
-                return ("No data")
+                return eval(data)
+    def getnotes(self, player):
+        if len(player) > 2:
+            prep = self.secukey + "getnotes:" + player
+            self.sock.send(prep.encode())
+            notes = self.sock.recv(10240)
+            print notes
+            return eval(notes)
 
 class Data:
     root = Tk()
-    server = None
+    server = ClientSock(root)
     rank = StringVar()
     ip = StringVar()
     coordinates = StringVar()
@@ -87,8 +94,14 @@ class Data:
     notes = {}
     playerfull = {}
 
-    def __init__(self, server):
-        self.server = server
+    def search(self, var):
+        return self.server.search(var)
+
+    def login(self, userentry, passentry):
+        return self.server.login(userentry, passentry)
+
+    def close(self):
+        self.server.close()
         
     def refreshfulldata(self, player):
         server = 'survival'
@@ -116,7 +129,7 @@ class Data:
         if self.chat == None:
             self.chat = [{"date": "No data", "data": ""}]
         self.commands = self.server.getcommands(player)
-        print self.chat
+        self.notes = self.server.getnotes(player)
     def changedata(self, server):
         try:
             self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
@@ -155,8 +168,8 @@ class App:
     currentplayer = None
     currentserver = None
     firstsearch = True
-    server = None
-    data = Data(server)
+    data = Data()
+    inhist = 0
     loginframe = Frame(root)
     searchframe = Frame(root)
     searchstr = StringVar()
@@ -168,11 +181,11 @@ class App:
     serverselection = None
     serverframe = None
     historyframe = None
+    notebox = None
     onuser = 0
 
     def __init__(self):
         self.root = self.data.root
-        self.server = ClientSock(root)
         self.root.geometry("300x500")
         self.root.resizable(width=FALSE, height=FALSE)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
@@ -189,7 +202,7 @@ class App:
         Button(self.loginframe, text="Login", command=self.dologin).pack(fill=X)
         
     def dologin(self, event=None):
-        login = self.server.login(self.userentry.get(), self.passentry.get())
+        login = self.data.login(self.userentry.get(), self.passentry.get())
         if login:
             self.loginframe.pack_forget()
             self.loginframe.destroy()
@@ -210,7 +223,7 @@ class App:
         if self.firstsearch:
                 self.searchstr.set("")
                 self.firstsearch = 0
-        search = self.server.search(stringvar.get())
+        search = self.data.search(stringvar.get())
         if not search == None:
             if self.onuser:
                 self.userframe.pack_forget()
@@ -282,15 +295,37 @@ class App:
         Label(self.serverframe, text="Banned:", anchor=W).grid(row=7)
         Label(self.serverframe, textvariable=self.data.banned).grid(row=7, column=1)
 
-        Button(self.serverframe, text="Chat", command=self.server.getchat(self.currentplayer)).grid(row=8)
-        Button(self.serverframe, text="History", command=self.historywindow).grid(row=9)
+        # Ban Reason 8
+        Label(self.serverframe, text="Ban reason:", anchor=W).grid(row=8)
+        Label(self.serverframe, textvariable=self.data.banreason, anchor=W).grid(row=8, column=1)
+
+        # Notes 9
+        Label(self.serverframe, text="Notes").grid(row=9, columnspan=2)
+        self.notebox = Listbox(self.serverframe)
+        self.notebox.grid(row=10, columnspan=2, sticky=W+E)
+        try:
+            for i in self.data.notes:
+                self.notebox.insert(END, i['notes'])
+        except:
+            pass
+        lowbar = Frame(self.serverframe, height=150, width=300, relief=SUNKEN)
+        lowbar.grid(row=11, columnspan=2)
+
+        Button(lowbar, text="History", command=self.historywindow).pack(expand=1)
+        Button(lowbar, text="Notes").pack(fill=X, expand=1)
 
     def changeserver(self, event=None):
+        if self.inhist:
+            self.historyframe.pack_forget()
+            self.historyframe.destroy()
+            self.serverframe.pack(fill=BOTH, expand=1)
+            self.inhist = 0
         self.currentserver = self.serverbox.get().lower()
         self.data.changedata(self.currentserver)
 
     def historywindow(self):
-        self.historyframe = Frame(userframe)
+        self.inhist = 1
+        self.historyframe = Frame(self.userframe)
         self.serverframe.pack_forget()
         self.historyframe.pack(fill=BOTH, expand=1)
         Button(self.historyframe, text="Back", command=self.historyback).pack(fill=X)
@@ -310,12 +345,13 @@ class App:
         self.historyframe.pack_forget()
         self.historyframe.destroy()
         self.serverframe.pack(fill=BOTH, expand=1)
+        self.inhist = 0
 
     def runloop(self):
         self.root.mainloop()
 
     def close(self):
-        self.server.close()
+        self.data.close()
         self.root.destroy()
 
 app = App()
