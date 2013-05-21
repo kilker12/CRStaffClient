@@ -1,7 +1,6 @@
 from Tkinter import *
 from ttk import *
 import socket
-import sys
 import datetime
 
 class ClientSock():
@@ -14,12 +13,12 @@ class ClientSock():
         self.root = main
         try:
             self.sock = socket.socket()
-            self.sock.connect(("mc.craftrealms.com", 9999))
+            self.sock.connect(("tekkittest.craftrealms.com", 80))
         except:
             Label(self.root, text="Cannot get connection to server!").pack()
-            Button(self.root, text="Close", command=self.closewin).pack()
+            Button(self.root, text="Close", command=self.close_win).pack()
             self.root.mainloop()
-    def closewin(self):
+    def close_win(self):
         self.root.destroy()
         self.root.quit()
     def login(self, username, password):
@@ -30,38 +29,32 @@ class ClientSock():
             reply = reply.split(":")
             if reply[0] == "ok":
                 self.loggedinusername = username
-                self.secukey = reply[1] + "," + username + ":"
+                #self.secukey = reply[1] + "," + username + ":"
                 return 1
             elif reply[0] == "bad":
                 return 0
             else:
-                print reply
+                print(reply)
     def close(self):
         self.sock.send("disconnect".encode())
         self.sock.close()
         
     def search(self, string):
         if len(string) > 2:
-            prep = self.secukey + "search:" + string
+            prep = "search:" + string
             self.sock.send(prep.encode())
             reply = self.sock.recv(10240)
             reply = reply.split(",")
             return reply
-    def getinfo(self, player):
-        if len(player) > 2:
-            prep = self.secukey + "getinfo:" + player
-            self.sock.send(prep.encode())
-            data = self.sock.recv(10240)
-            return eval(data)
     def getcommands(self, player):
         if len(player) > 2:
-            prep = self.secukey + "getcommands:" + player
+            prep = "getcommands:" + player
             self.sock.send(prep.encode())
             data = self.sock.recv(10240)
             return eval(data)
     def getchat(self, player):
         if len(player) > 2:
-            prep = self.secukey + "getchat:" + player
+            prep = "getchat:" + player
             self.sock.send(prep.encode())
             data = self.sock.recv(10240)
             if data == "no data":
@@ -70,10 +63,9 @@ class ClientSock():
                 return eval(data)
     def getnotes(self, player):
         if len(player) > 2:
-            prep = self.secukey + "getnotes:" + player
+            prep = "getnotes:" + player
             self.sock.send(prep.encode())
             notes = self.sock.recv(10240)
-            print notes
             return eval(notes)
 
 class Data:
@@ -105,61 +97,6 @@ class Data:
         
     def refreshfulldata(self, player):
         server = 'survival'
-        self.playerfull = self.server.getinfo(player)
-        self.rank.set(self.playerfull['rank'])
-        self.ip.set(self.playerfull['servers']['survival']['ipAddress'])
-        self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
-        self.lastlogin.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['login'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
-        self.lasttp.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['lastteleport'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
-        self.lastlogout.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['logout'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
-        try:
-            if(self.playerfull['servers'][server]['muted']):
-                self.muted.set("Yes")
-            else:
-                self.muted.set("No")
-        except:
-            self.muted.set("No")
-        try:
-            self.banreason.set(self.playerfull['servers'][server]['ban']['reason'])
-            self.banned.set("Yes")
-        except:
-            self.banned.set("No")
-            self.banreason.set("-")
-        self.chat = self.server.getchat(player)
-        if self.chat == None:
-            self.chat = [{"date": "No data", "data": ""}]
-        self.commands = self.server.getcommands(player)
-        self.notes = self.server.getnotes(player)
-    def changedata(self, server):
-        try:
-            self.coordinates.set(self.playerfull['servers'][server]['lastlocation']['world'] + ", " + self.playerfull['servers'][server]['lastlocation']['x'] + ", " + self.playerfull['servers'][server]['lastlocation']['y'] + ", " + self.playerfull['servers'][server]['lastlocation']['z'])
-        except:
-            self.coordinates.set("-")
-        try:
-            self.lastlogin.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['login'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
-        except:
-            self.lastlogin.set("-")
-        try:
-            self.lasttp.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['lastteleport'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
-        except:
-            self.lasttp.set("-")
-        try:
-            self.lastlogout.set(datetime.datetime.utcfromtimestamp(self.playerfull['servers'][server]['timestamps']['logout'] // 1000).strftime('%H:%M:%S %m-%d-%Y'))
-        except:
-            self.lastlogout.set("-")
-        try:
-            if(self.playerfull['servers'][server]['muted']):
-                self.muted.set("Yes")
-            else:
-                self.muted.set("No")
-        except:
-            self.muted.set("No")
-        try:
-            self.banreason.set(self.playerfull['servers'][server]['ban']['reason'])
-            self.banned.set("Yes")
-        except:
-            self.banned.set("No")
-            self.banreason.set("-")
         
 class App:
     root = None
@@ -322,30 +259,6 @@ class App:
             self.inhist = 0
         self.currentserver = self.serverbox.get().lower()
         self.data.changedata(self.currentserver)
-
-    def historywindow(self):
-        self.inhist = 1
-        self.historyframe = Frame(self.userframe)
-        self.serverframe.pack_forget()
-        self.historyframe.pack(fill=BOTH, expand=1)
-        Button(self.historyframe, text="Back", command=self.historyback).pack(fill=X)
-        Label(self.historyframe, text="Command History").pack()
-        commandbox = Listbox(self.historyframe, height=10)
-        for i in self.data.commands:
-            commandbox.insert(END, i['date'] + " " + i['data'])
-        commandbox.pack(fill=X, expand=1)
-
-        Label(self.historyframe, text="Chat History").pack()
-        chatbox = Listbox(self.historyframe, height=10)
-        for i in self.data.chat:
-            chatbox.insert(END, i['date'] + " " + i['data'])
-        chatbox.pack(fill=X, expand=1)
-
-    def historyback(self):
-        self.historyframe.pack_forget()
-        self.historyframe.destroy()
-        self.serverframe.pack(fill=BOTH, expand=1)
-        self.inhist = 0
 
     def runloop(self):
         self.root.mainloop()
