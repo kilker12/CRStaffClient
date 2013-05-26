@@ -13,7 +13,7 @@ class ClientSock():
         self.root = main
         try:
             self.sock = socket.socket()
-            self.sock.connect(("tekkittest.craftrealms.com", 80))
+            self.sock.connect(("mc.craftrealms.com", 9999))
         except:
             Label(self.root, text="Cannot get connection to server!").pack()
             Button(self.root, text="Close", command=self.close_win).pack()
@@ -24,7 +24,7 @@ class ClientSock():
     def login(self, username, password):
         if len(username) > 2 and len(password) > 2:
             prep = "login:" + username + ":" + password
-            self.sock.send(prep.encode())
+            self.sock.send(prep)
             reply = self.sock.recv(1024)
             reply = reply.split(":")
             if reply[0] == "ok":
